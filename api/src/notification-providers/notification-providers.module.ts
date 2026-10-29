@@ -11,7 +11,7 @@ import { NotificationProviderFactory } from './notification-provider.factory.js'
     TelegramProvider,
     NotificationProviderFactory,
   ],
-  exports: [NotificationProviderFactory],
+  exports: [NotificationProviderFactory, EmailProvider],
 })
 export class NotificationProvidersModule {}
 

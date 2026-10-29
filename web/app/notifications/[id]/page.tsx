@@ -111,6 +111,21 @@ function NotificationDetailsContent({
     }
   };
 
+  const handleRetryDelivery = async (deliveryId: string) => {
+    if (!notification) return;
+    setActionLoading(true);
+    try {
+      await api.retryDelivery(notification.id, deliveryId);
+      await fetchDetails();
+    } catch (err: any) {
+      alert(`Error retrying delivery: ${err.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const hasFailedDeliveries = deliveries.some((d) => d.status === 'FAILED');
+
   if (loading && !notification) {
     return (
       <div className="p-16 text-center text-slate-500 dark:text-zinc-400">
@@ -140,6 +155,7 @@ function NotificationDetailsContent({
     <div className="max-w-4xl mx-auto space-y-8">
       <NotificationHeader
         notification={notification}
+        hasFailedDeliveries={hasFailedDeliveries}
         loading={loading}
         actionLoading={actionLoading}
         onRefresh={() => fetchDetails()}
@@ -165,7 +181,12 @@ function NotificationDetailsContent({
           Delivery Channels & Attempt History
         </h2>
         {deliveries.map((delivery) => (
-          <DeliveryCard key={delivery.id} delivery={delivery} />
+          <DeliveryCard
+            key={delivery.id}
+            delivery={delivery}
+            onRetry={handleRetryDelivery}
+            isRetrying={actionLoading}
+          />
         ))}
       </div>
     </div>

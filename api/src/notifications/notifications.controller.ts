@@ -14,12 +14,56 @@ import { NotificationsService } from './notifications.service.js';
 import {
   CreateNotificationSchema,
   NotificationQuerySchema,
+  SendTestEmailSchema,
   UpdateNotificationSchema,
 } from './notifications.dto.js';
 
 @Controller('api/notifications')
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
+
+  @Post('test-email')
+  @HttpCode(HttpStatus.OK)
+  async sendTestEmail(@Body() body: unknown) {
+    const parseResult = SendTestEmailSchema.safeParse(body);
+    if (!parseResult.success) {
+      const issues = parseResult.error.issues.map(
+        (i) => `${i.path.join('.')}: ${i.message}`,
+      );
+      throw new BadRequestException({
+        statusCode: 400,
+        message: 'Validation failed for test email',
+        errors: issues,
+      });
+    }
+
+    const { to, recipient, subject, title, body: textBody, text } = parseResult.data;
+    const targetEmail = (to || recipient)!;
+    const emailSubject = subject || title || 'Test Email from EC Learnix';
+    const emailBody =
+      textBody ||
+      text ||
+      'Hello! This is a test email sent from the Scheduled Notifications local testing API.';
+
+    try {
+      const result = await this.notificationsService.sendTestEmail({
+        to: targetEmail,
+        subject: emailSubject,
+        body: emailBody,
+      });
+
+      return {
+        statusCode: 200,
+        message: 'Test email sent successfully',
+        data: result,
+      };
+    } catch (err: any) {
+      throw new BadRequestException({
+        statusCode: 400,
+        message: `Failed to send test email: ${err?.message || 'SMTP delivery failure'}`,
+      });
+    }
+  }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -107,6 +151,20 @@ export class NotificationsController {
   @HttpCode(HttpStatus.OK)
   async retry(@Param('id') id: string) {
     const result = await this.notificationsService.retry(id);
+    return {
+      statusCode: 200,
+      message: result.message,
+      data: { retriedCount: result.retriedCount },
+    };
+  }
+
+  @Post(':id/deliveries/:deliveryId/retry')
+  @HttpCode(HttpStatus.OK)
+  async retryDelivery(
+    @Param('id') id: string,
+    @Param('deliveryId') deliveryId: string,
+  ) {
+    const result = await this.notificationsService.retry(id, deliveryId);
     return {
       statusCode: 200,
       message: result.message,

@@ -126,6 +126,14 @@ describe('Notifications Validation & DTOs', () => {
         expect(result.data.status).toBe('PENDING');
       }
     });
+
+    it('transforms status ALL to undefined', () => {
+      const result = NotificationQuerySchema.safeParse({ status: 'ALL' });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.status).toBeUndefined();
+      }
+    });
   });
 });
 

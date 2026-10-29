@@ -63,9 +63,28 @@ export const UpdateNotificationSchema = z.object({
 export type UpdateNotificationDto = z.infer<typeof UpdateNotificationSchema>;
 
 export const NotificationQuerySchema = z.object({
-  status: z.enum(['PENDING', 'PROCESSING', 'SENT', 'FAILED', 'CANCELLED']).optional(),
+  status: z
+    .enum(['ALL', 'PENDING', 'PROCESSING', 'SENT', 'FAILED', 'CANCELLED'])
+    .optional()
+    .transform((val) => (val === 'ALL' || !val ? undefined : val)),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
 });
 
 export type NotificationQueryDto = z.infer<typeof NotificationQuerySchema>;
+
+export const SendTestEmailSchema = z
+  .object({
+    to: z.string().trim().email('Invalid email address format').optional(),
+    recipient: z.string().trim().email('Invalid email address format').optional(),
+    subject: z.string().trim().min(1).max(255).optional(),
+    title: z.string().trim().min(1).max(255).optional(),
+    body: z.string().trim().min(1).optional(),
+    text: z.string().trim().min(1).optional(),
+  })
+  .refine((data) => data.to || data.recipient, {
+    message: 'Recipient email address is required (provide "to" or "recipient")',
+    path: ['to'],
+  });
+
+export type SendTestEmailDto = z.infer<typeof SendTestEmailSchema>;

@@ -112,7 +112,7 @@ describe('NotificationProcessor', () => {
     expect(mockRepo.recordDeliverySuccess).not.toHaveBeenCalled();
   });
 
-  it('schedules retry with backoff and records failure on temporary error', async () => {
+  it('schedules retry immediately with 0 delay and records failure on temporary error', async () => {
     const claim = {
       delivery: {
         id: 'del-1',
@@ -142,7 +142,9 @@ describe('NotificationProcessor', () => {
         errorMessage: 'Network timeout connecting to Telegram',
       }),
     );
-    expect(mockQueueService.enqueueDelivery).toHaveBeenCalledTimes(1);
+    expect(mockQueueService.enqueueDelivery).toHaveBeenCalledWith('del-1', expect.any(Date), {
+      overrideDelayMs: 0,
+    });
   });
 
   it('marks delivery as permanently FAILED when max retries are exhausted', async () => {

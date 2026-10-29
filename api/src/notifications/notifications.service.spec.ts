@@ -25,9 +25,14 @@ describe('NotificationsService', () => {
       removeDelivery: vi.fn().mockResolvedValue(undefined),
     };
 
+    const mockEmailProvider = {
+      send: vi.fn().mockResolvedValue({ providerMessageId: 'test-email-msg-id' }),
+    };
+
     service = new NotificationsService(
       mockRepo as NotificationsRepository,
       mockQueueService as NotificationQueueService,
+      mockEmailProvider as any,
     );
   });
 
@@ -143,7 +148,37 @@ describe('NotificationsService', () => {
     const result = await service.retry('notif-1');
 
     expect(result.retriedCount).toBe(2);
+    expect(mockRepo.resetFailedDeliveriesForRetry).toHaveBeenCalledWith('notif-1', undefined);
     expect(mockQueueService.enqueueDelivery).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries single failed delivery by re-enqueuing immediately', async () => {
+    (mockRepo.findById as any).mockResolvedValue({
+      id: 'notif-1',
+      status: 'FAILED',
+    });
+
+    (mockRepo.resetFailedDeliveriesForRetry as any).mockResolvedValue([
+      { id: 'del-failed-1' },
+    ]);
+
+    const result = await service.retry('notif-1', 'del-failed-1');
+
+    expect(result.retriedCount).toBe(1);
+    expect(mockRepo.resetFailedDeliveriesForRetry).toHaveBeenCalledWith('notif-1', 'del-failed-1');
+    expect(mockQueueService.enqueueDelivery).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends test email directly through email provider', async () => {
+    const res = await service.sendTestEmail({
+      to: 'recipient@example.com',
+      subject: 'POC Test',
+      body: 'Testing Nodemailer',
+    });
+
+    expect(res.recipient).toBe('recipient@example.com');
+    expect(res.providerMessageId).toBe('test-email-msg-id');
+    expect(res.sentAt).toBeDefined();
   });
 });
 

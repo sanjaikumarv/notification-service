@@ -5,6 +5,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 
 interface NotificationHeaderProps {
   notification: ScheduledNotification;
+  hasFailedDeliveries?: boolean;
   loading: boolean;
   actionLoading: boolean;
   onRefresh: () => void;
@@ -14,6 +15,7 @@ interface NotificationHeaderProps {
 
 export const NotificationHeader: React.FC<NotificationHeaderProps> = ({
   notification,
+  hasFailedDeliveries = false,
   loading,
   actionLoading,
   onRefresh,
@@ -72,7 +74,7 @@ export const NotificationHeader: React.FC<NotificationHeaderProps> = ({
           </button>
         )}
 
-        {notification.status === 'FAILED' && (
+        {(notification.status === 'FAILED' || hasFailedDeliveries) && (
           <button
             onClick={onRetry}
             disabled={actionLoading}

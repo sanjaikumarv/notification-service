@@ -68,11 +68,15 @@ export class NotificationsRepository {
     let whereClause = '';
 
     if (params.status) {
-      values.push(params.status);
-      whereClause = `WHERE status = $${values.length}`;
+      if (params.status === 'FAILED') {
+        whereClause = `WHERE (n.status = 'FAILED' OR EXISTS (SELECT 1 FROM notification_deliveries d2 WHERE d2.notification_id = n.id AND d2.status = 'FAILED'))`;
+      } else {
+        values.push(params.status);
+        whereClause = `WHERE n.status = $${values.length}`;
+      }
     }
 
-    const countSql = `SELECT COUNT(*) AS total FROM notifications ${whereClause}`;
+    const countSql = `SELECT COUNT(*) AS total FROM notifications n ${whereClause}`;
     const countResult = await this.db.query<{ total: string }>(countSql, values);
     const total = parseInt(countResult.rows[0]?.total ?? '0', 10);
 
@@ -408,8 +412,8 @@ export class NotificationsRepository {
     if (allSent) {
       newStatus = 'SENT';
     } else if (allFinal) {
-      const anySent = statuses.some((s) => s === 'SENT');
-      newStatus = anySent ? 'SENT' : 'FAILED';
+      const anyFailed = statuses.some((s) => s === 'FAILED');
+      newStatus = anyFailed ? 'FAILED' : 'SENT';
     }
 
     await client.query(
@@ -451,20 +455,37 @@ export class NotificationsRepository {
     return res.rows;
   }
 
-  async resetFailedDeliveriesForRetry(notificationId: string): Promise<NotificationDeliveryRecord[]> {
+  async resetFailedDeliveriesForRetry(
+    notificationId: string,
+    deliveryId?: string,
+  ): Promise<NotificationDeliveryRecord[]> {
     return this.db.transaction(async (client) => {
+      const conditions = ['notification_id = $1', "status = 'FAILED'"];
+      const values: any[] = [notificationId];
+      if (deliveryId) {
+        values.push(deliveryId);
+        conditions.push(`id = $${values.length}`);
+      }
+
       const delivRes = await client.query<NotificationDeliveryRecord>(
         `UPDATE notification_deliveries
          SET status = 'PENDING',
+             attempt_count = 0,
              last_error = NULL,
              next_retry_at = NOW(),
              updated_at = NOW()
-         WHERE notification_id = $1 AND status = 'FAILED'
+         WHERE ${conditions.join(' AND ')}
          RETURNING *`,
-        [notificationId],
+        values,
       );
 
       if (delivRes.rows.length > 0) {
+        const resetDeliveryIds = delivRes.rows.map((d) => d.id);
+        await client.query(
+          `DELETE FROM delivery_attempts WHERE delivery_id = ANY($1::uuid[])`,
+          [resetDeliveryIds],
+        );
+
         await client.query(
           `UPDATE notifications
            SET status = 'PENDING', updated_at = NOW()

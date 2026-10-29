@@ -133,7 +133,7 @@ export const NotificationTable: React.FC<NotificationTableProps> = ({
                         {isActing ? '...' : 'Cancel'}
                       </button>
                     )}
-                    {notif.status === 'FAILED' && (
+                    {(notif.status === 'FAILED' || notif.deliveries?.some((d) => d.status === 'FAILED')) && (
                       <button
                         onClick={() => onRetry(notif.id)}
                         disabled={isActing}

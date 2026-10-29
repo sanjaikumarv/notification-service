@@ -3,9 +3,10 @@ import { NotificationsController } from './notifications.controller.js';
 import { NotificationsService } from './notifications.service.js';
 import { NotificationsRepository } from './notifications.repository.js';
 import { NotificationQueueModule } from '../notification-queue/notification-queue.module.js';
+import { NotificationProvidersModule } from '../notification-providers/notification-providers.module.js';
 
 @Module({
-  imports: [NotificationQueueModule],
+  imports: [NotificationQueueModule, NotificationProvidersModule],
   controllers: [NotificationsController],
   providers: [NotificationsService, NotificationsRepository],
   exports: [NotificationsService, NotificationsRepository],

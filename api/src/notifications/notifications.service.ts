@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { NotificationsRepository } from './notifications.repository.js';
 import { NotificationQueueService } from '../notification-queue/notification-queue.service.js';
+import { EmailProvider } from '../notification-providers/email.provider.js';
 import type {
   CreateNotificationDto,
   NotificationQueryDto,
@@ -23,6 +24,7 @@ export class NotificationsService {
   constructor(
     private readonly repo: NotificationsRepository,
     private readonly queueService: NotificationQueueService,
+    private readonly emailProvider: EmailProvider,
   ) {}
 
   /**
@@ -171,20 +173,26 @@ export class NotificationsService {
     return cancelled;
   }
 
-  async retry(id: string): Promise<{ message: string; retriedCount: number }> {
+  async retry(
+    id: string,
+    deliveryId?: string,
+  ): Promise<{ message: string; retriedCount: number }> {
     const existing = await this.repo.findById(id);
     if (!existing) {
       throw new NotFoundException(`Notification with ID ${id} not found`);
     }
 
-    const retriedDeliveries = await this.repo.resetFailedDeliveriesForRetry(id);
+    const retriedDeliveries = await this.repo.resetFailedDeliveriesForRetry(
+      id,
+      deliveryId,
+    );
     if (retriedDeliveries.length === 0) {
       throw new BadRequestException(
         'No eligible failed deliveries found to retry for this notification',
       );
     }
 
-    // Re-enqueue BullMQ jobs immediately
+    // Re-enqueue BullMQ jobs immediately with 0 delay
     for (const delivery of retriedDeliveries) {
       await this.queueService.enqueueDelivery(delivery.id, new Date(), {
         overrideDelayMs: 0,
@@ -196,7 +204,7 @@ export class NotificationsService {
     );
 
     return {
-      message: `Successfully scheduled retry for ${retriedDeliveries.length} deliveries`,
+      message: `Successfully scheduled retry for ${retriedDeliveries.length} delivery(ies)`,
       retriedCount: retriedDeliveries.length,
     };
   }
@@ -209,5 +217,32 @@ export class NotificationsService {
       );
     }
     return this.repo.getDeliveriesWithAttempts(notificationId);
+  }
+
+  async sendTestEmail(params: {
+    to: string;
+    subject?: string;
+    body?: string;
+  }): Promise<{ recipient: string; providerMessageId: string; sentAt: string }> {
+    const recipient = params.to.trim();
+    const title = params.subject?.trim() || 'Test Email from EC Learnix';
+    const body =
+      params.body?.trim() ||
+      'Hello! This is a test email sent from the Scheduled Notifications local testing API.';
+
+    this.logger.log(`Dispatching test email to ${recipient}...`);
+
+    const result = await this.emailProvider.send({
+      recipient,
+      title,
+      body,
+      idempotencyKey: `test-email-${Date.now()}`,
+    });
+
+    return {
+      recipient,
+      providerMessageId: result.providerMessageId || 'msg-sent',
+      sentAt: new Date().toISOString(),
+    };
   }
 }

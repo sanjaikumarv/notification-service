@@ -127,4 +127,13 @@ export const api = {
       method: "POST",
     });
   },
+
+  async retryDelivery(
+    notificationId: string,
+    deliveryId: string,
+  ): Promise<{ message: string; data: { retriedCount: number } }> {
+    return fetchJson(`/api/notifications/${notificationId}/deliveries/${deliveryId}/retry`, {
+      method: "POST",
+    });
+  },
 };

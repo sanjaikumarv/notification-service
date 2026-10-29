@@ -88,15 +88,8 @@ export class NotificationProcessor extends WorkerHost {
       const isFinal = attemptNumber >= MAX_DELIVERY_ATTEMPTS;
 
       if (!isFinal) {
-        // Bounded exponential backoff with jitter
-        const exponentialDelay =
-          BASE_RETRY_DELAY_MS * Math.pow(2, attemptNumber - 1);
-        const jitter = Math.floor(Math.random() * 2000);
-        const retryDelayMs = Math.min(
-          MAX_RETRY_DELAY_MS,
-          exponentialDelay + jitter,
-        );
-        const nextRetryAt = new Date(Date.now() + retryDelayMs);
+        // Immediate retry without execution delay
+        const nextRetryAt = new Date();
 
         await this.repo.recordDeliveryFailure({
           deliveryId: delivery.id,
@@ -106,13 +99,13 @@ export class NotificationProcessor extends WorkerHost {
           nextRetryAt,
         });
 
-        // Re-enqueue retry with calculated delay
+        // Re-enqueue retry immediately with 0 delay
         await this.queueService.enqueueDelivery(delivery.id, nextRetryAt, {
-          overrideDelayMs: retryDelayMs,
+          overrideDelayMs: 0,
         });
 
         this.logger.log(
-          `[Worker] Scheduled retry for delivery ${delivery.id} in ${retryDelayMs}ms at ${nextRetryAt.toISOString()}`,
+          `[Worker] Scheduled immediate retry (0ms delay) for delivery ${delivery.id} (attempt ${attemptNumber + 1}/${MAX_DELIVERY_ATTEMPTS})`,
         );
       } else {
         // Exhausted retries

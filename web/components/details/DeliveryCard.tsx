@@ -6,9 +6,15 @@ import { formatDate } from '@/lib/date';
 
 interface DeliveryCardProps {
   delivery: NotificationDelivery;
+  onRetry?: (deliveryId: string) => void;
+  isRetrying?: boolean;
 }
 
-export const DeliveryCard: React.FC<DeliveryCardProps> = ({ delivery }) => {
+export const DeliveryCard: React.FC<DeliveryCardProps> = ({
+  delivery,
+  onRetry,
+  isRetrying = false,
+}) => {
   return (
     <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
       {/* Delivery Channel Header */}
@@ -35,19 +41,30 @@ export const DeliveryCard: React.FC<DeliveryCardProps> = ({ delivery }) => {
           </div>
         </div>
 
-        <div className="text-xs text-slate-500 dark:text-zinc-400 space-y-0.5 sm:text-right">
-          <div>
-            Attempts: <span className="font-semibold">{delivery.attempt_count}</span> / 4 max
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="text-xs text-slate-500 dark:text-zinc-400 space-y-0.5 sm:text-right">
+            <div>
+              Attempts: <span className="font-semibold">{delivery.attempt_count}</span> / 4 max
+            </div>
+            {delivery.sent_at && (
+              <div className="text-emerald-600 dark:text-emerald-400 font-medium">
+                Sent: {formatDate(delivery.sent_at)}
+              </div>
+            )}
+            {delivery.next_retry_at && (
+              <div className="text-amber-600 dark:text-amber-400 font-medium">
+                Next Retry: {formatDate(delivery.next_retry_at)}
+              </div>
+            )}
           </div>
-          {delivery.sent_at && (
-            <div className="text-emerald-600 dark:text-emerald-400 font-medium">
-              Sent: {formatDate(delivery.sent_at)}
-            </div>
-          )}
-          {delivery.next_retry_at && (
-            <div className="text-amber-600 dark:text-amber-400 font-medium">
-              Next Retry: {formatDate(delivery.next_retry_at)}
-            </div>
+          {delivery.status === 'FAILED' && onRetry && (
+            <button
+              onClick={() => onRetry(delivery.id)}
+              disabled={isRetrying}
+              className="px-3 py-1.5 text-xs font-semibold rounded-md border border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-900 dark:text-indigo-400 dark:hover:bg-indigo-950/40 transition disabled:opacity-50"
+            >
+              {isRetrying ? 'Retrying...' : 'Retry Delivery'}
+            </button>
           )}
         </div>
       </div>
