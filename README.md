@@ -12,7 +12,7 @@ The system provides atomic multi-channel scheduling, duplicate-processing preven
 |---|---|---|
 | **Email** | 🟢 **Fully Integrated & Active** | Dispatched via **Nodemailer** using standard SMTP authentication (Gmail App Password, Ethereal, Mailtrap, AWS SES). |
 | **Push Notifications** | 🟢 **Fully Integrated (FCM v1 & Mock)** | Dispatched via **Firebase Cloud Messaging HTTP v1 API** with RS256 Service Account authentication (`FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL`, `FCM_PRIVATE_KEY`). Defaults to deterministic mock receipts when credentials are unset or `PUSH_PROVIDER=mock`. |
-| **Telegram** | 🟡 **Architecture Ready (Pending Bot Credentials)** | The Telegram Bot API dispatcher (`sendMessage` via native `fetch`) is implemented and tested with error-handling/retries; live delivery requires a valid `TELEGRAM_BOT_TOKEN`. |
+| **Telegram** | ⚪ **Disabled / Inactive** | Removed from active UI channels. |
 
 ---
 

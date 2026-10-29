@@ -27,11 +27,7 @@ export class NotificationsService {
     private readonly emailProvider: EmailProvider,
   ) {}
 
-  /**
-   * Interprets date/time in specified IANA timezone and resolves to UTC instant
-   */
   resolveScheduledDate(scheduledAt: string, timezone: string): Date {
-    // If string has explicit offset or Z, standard Date parsing evaluates it
     const date = new Date(scheduledAt);
     if (isNaN(date.getTime())) {
       throw new BadRequestException('Invalid date provided for scheduled_at');
@@ -39,15 +35,9 @@ export class NotificationsService {
     return date;
   }
 
-  async create(
-    dto: CreateNotificationDto,
-  ): Promise<NotificationWithDeliveries> {
-    const scheduledAtUtc = this.resolveScheduledDate(
-      dto.scheduled_at,
-      dto.timezone,
-    );
-    console.log('dto---->', dto);
-    // Atomically insert notification and channel-specific deliveries
+  async create(dto: CreateNotificationDto): Promise<NotificationWithDeliveries> {
+    const scheduledAtUtc = this.resolveScheduledDate(dto.scheduled_at, dto.timezone);
+
     const notification = await this.repo.createNotificationWithDeliveries({
       title: dto.title,
       body: dto.body,
@@ -56,19 +46,12 @@ export class NotificationsService {
       channels: dto.channels,
     });
 
-    this.logger.log(
-      `Created notification ${notification.id} scheduled for ${scheduledAtUtc.toISOString()} (${dto.timezone}) with ${dto.channels.length} delivery channel(s)`,
-    );
-
-    // Enqueue independent BullMQ jobs for each delivery
     for (const delivery of notification.deliveries) {
-      try {
-        await this.queueService.enqueueDelivery(delivery.id, scheduledAtUtc);
-      } catch (err: any) {
-        this.logger.error(
-          `Failed to enqueue BullMQ job for delivery ${delivery.id}: ${err.message}. Recovery process will reconcile this.`,
+      await this.queueService
+        .enqueueDelivery(delivery.id, scheduledAtUtc)
+        .catch((err) =>
+          this.logger.error(`Failed to enqueue delivery ${delivery.id}: ${err.message}`),
         );
-      }
     }
 
     return notification;
@@ -100,25 +83,19 @@ export class NotificationsService {
     return notification;
   }
 
-  async update(
-    id: string,
-    dto: UpdateNotificationDto,
-  ): Promise<NotificationRecord> {
+  async update(id: string, dto: UpdateNotificationDto): Promise<NotificationRecord> {
     const existing = await this.repo.findById(id);
     if (!existing) {
       throw new NotFoundException(`Notification with ID ${id} not found`);
     }
 
     if (existing.status !== 'PENDING') {
-      throw new BadRequestException(
-        `Cannot edit a notification with status "${existing.status}". Only PENDING notifications can be edited.`,
-      );
+      throw new BadRequestException(`Cannot edit notification with status "${existing.status}"`);
     }
 
     let scheduledAtUtc: Date | undefined;
     if (dto.scheduled_at) {
-      const tz = dto.timezone || existing.timezone;
-      scheduledAtUtc = this.resolveScheduledDate(dto.scheduled_at, tz);
+      scheduledAtUtc = this.resolveScheduledDate(dto.scheduled_at, dto.timezone || existing.timezone);
     }
 
     const updated = await this.repo.updatePendingNotification(id, {
@@ -132,7 +109,6 @@ export class NotificationsService {
       throw new BadRequestException('Failed to update notification');
     }
 
-    // If scheduled time was changed, update pending BullMQ queue jobs
     if (scheduledAtUtc) {
       for (const delivery of existing.deliveries) {
         if (delivery.status === 'PENDING') {
@@ -152,9 +128,7 @@ export class NotificationsService {
     }
 
     if (existing.status === 'CANCELLED' || existing.status === 'SENT') {
-      throw new BadRequestException(
-        `Cannot cancel notification because its current status is "${existing.status}"`,
-      );
+      throw new BadRequestException(`Cannot cancel notification with status "${existing.status}"`);
     }
 
     const cancelled = await this.repo.cancelNotification(id);
@@ -162,46 +136,31 @@ export class NotificationsService {
       throw new BadRequestException('Unable to cancel notification');
     }
 
-    // Remove queued jobs from BullMQ
     for (const delivery of existing.deliveries) {
       if (delivery.status === 'PENDING') {
         await this.queueService.removeDelivery(delivery.id);
       }
     }
 
-    this.logger.log(`Cancelled notification ${id}`);
     return cancelled;
   }
 
-  async retry(
-    id: string,
-    deliveryId?: string,
-  ): Promise<{ message: string; retriedCount: number }> {
+  async retry(id: string, deliveryId?: string): Promise<{ message: string; retriedCount: number }> {
     const existing = await this.repo.findById(id);
     if (!existing) {
       throw new NotFoundException(`Notification with ID ${id} not found`);
     }
 
-    const retriedDeliveries = await this.repo.resetFailedDeliveriesForRetry(
-      id,
-      deliveryId,
-    );
+    const retriedDeliveries = await this.repo.resetFailedDeliveriesForRetry(id, deliveryId);
     if (retriedDeliveries.length === 0) {
-      throw new BadRequestException(
-        'No eligible failed deliveries found to retry for this notification',
-      );
+      throw new BadRequestException('No eligible failed deliveries found to retry');
     }
 
-    // Re-enqueue BullMQ jobs immediately with 0 delay
     for (const delivery of retriedDeliveries) {
       await this.queueService.enqueueDelivery(delivery.id, new Date(), {
         overrideDelayMs: 0,
       });
     }
-
-    this.logger.log(
-      `Re-enqueued ${retriedDeliveries.length} failed delivery jobs for notification ${id}`,
-    );
 
     return {
       message: `Successfully scheduled retry for ${retriedDeliveries.length} delivery(ies)`,
@@ -212,9 +171,7 @@ export class NotificationsService {
   async getDeliveries(notificationId: string) {
     const existing = await this.repo.findById(notificationId);
     if (!existing) {
-      throw new NotFoundException(
-        `Notification with ID ${notificationId} not found`,
-      );
+      throw new NotFoundException(`Notification with ID ${notificationId} not found`);
     }
     return this.repo.getDeliveriesWithAttempts(notificationId);
   }
@@ -226,11 +183,7 @@ export class NotificationsService {
   }): Promise<{ recipient: string; providerMessageId: string; sentAt: string }> {
     const recipient = params.to.trim();
     const title = params.subject?.trim() || 'Test Email from EC Learnix';
-    const body =
-      params.body?.trim() ||
-      'Hello! This is a test email sent from the Scheduled Notifications local testing API.';
-
-    this.logger.log(`Dispatching test email to ${recipient}...`);
+    const body = params.body?.trim() || 'Test email from local testing API';
 
     const result = await this.emailProvider.send({
       recipient,
@@ -249,7 +202,6 @@ export class NotificationsService {
   async deleteAll(): Promise<{ deletedCount: number }> {
     const deletedCount = await this.repo.deleteAllNotifications();
     await this.queueService.clearAllJobs();
-    this.logger.log(`Deleted all notification records (${deletedCount}) and cleared BullMQ queue`);
     return { deletedCount };
   }
 }

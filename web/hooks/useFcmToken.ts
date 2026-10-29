@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 export function useFcmToken() {
   const [token, setToken] = useState<string | null>(null);
   const [permission, setPermission] = useState<NotificationPermission>('default');
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -21,8 +21,7 @@ export function useFcmToken() {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return null;
     try {
       return await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-    } catch (err: any) {
-      console.warn('Service worker registration failed:', err?.message);
+    } catch {
       return null;
     }
   }, []);
@@ -43,7 +42,6 @@ export function useFcmToken() {
 
       if (perm !== 'granted') {
         setError('Notification permission was denied.');
-        setLoading(false);
         return null;
       }
 
@@ -52,53 +50,44 @@ export function useFcmToken() {
       const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
       const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 
-      // If Firebase SDK environment variables are provided, initialize Firebase
       if (apiKey && projectId && swReg) {
         try {
           const { initializeApp, getApps, getApp } = await import('firebase/app');
           const { getMessaging, getToken } = await import('firebase/messaging');
 
-          const app =
-            getApps().length > 0
-              ? getApp()
-              : initializeApp({
-                  apiKey,
-                  projectId,
-                  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-                  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-                });
+          const app = getApps().length > 0 ? getApp() : initializeApp({
+            apiKey,
+            projectId,
+            messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+            appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+          });
 
-          const messaging = getMessaging(app);
-          generatedToken = await getToken(messaging, {
+          generatedToken = await getToken(getMessaging(app), {
             serviceWorkerRegistration: swReg,
             vapidKey,
           });
-        } catch (firebaseErr: any) {
-          console.warn('Firebase SDK initialization notice:', firebaseErr?.message);
+        } catch {
+          // Fall through to local fallback
         }
       }
 
-      // If not using Firebase SDK yet or in development, generate a persistent web device token
       if (!generatedToken) {
         const existing = localStorage.getItem('ec_learnix_fcm_token');
-        generatedToken =
-          existing ||
-          `web-fcm-${Date.now()}-${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`;
+        generatedToken = existing || `web-fcm-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       }
 
       localStorage.setItem('ec_learnix_fcm_token', generatedToken);
       setToken(generatedToken);
 
-      // Register device token with NestJS backend
       await api.registerDevice({
         token: generatedToken,
         platform: 'WEB',
         deviceName: navigator.userAgent.slice(0, 100),
-      });
+      }).catch(() => {});
 
       return generatedToken;
     } catch (err: any) {
-      setError(err?.message || 'Failed to acquire FCM registration token');
+      setError(err?.message || 'Failed to acquire notification token');
       return null;
     } finally {
       setLoading(false);
@@ -113,4 +102,3 @@ export function useFcmToken() {
     requestPermissionAndGetToken,
   };
 }
-

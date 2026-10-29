@@ -2,11 +2,7 @@
 
 import React, { useEffect, useState, useCallback, use, Suspense, useRef } from 'react';
 import Link from 'next/link';
-import {
-  api,
-  ScheduledNotification,
-  NotificationDelivery,
-} from '@/lib/api';
+import { api, ScheduledNotification, NotificationDelivery } from '@/lib/api';
 import { NotificationHeader } from '@/components/details/NotificationHeader';
 import { NotificationMeta } from '@/components/details/NotificationMeta';
 import { DeliveryCard } from '@/components/details/DeliveryCard';
@@ -68,15 +64,14 @@ function NotificationDetailsContent({
     fetchDetails();
   }, [fetchDetails]);
 
-  // Real-time polling when pending or processing
   useEffect(() => {
     if (!notification) return;
-    const isTransitory =
+    const isPending =
       notification.status === 'PENDING' ||
       notification.status === 'PROCESSING' ||
       deliveries.some((d) => d.status === 'PENDING' || d.status === 'PROCESSING');
 
-    if (!isTransitory) return;
+    if (!isPending) return;
 
     const interval = setInterval(() => {
       fetchDetails(true);
@@ -85,7 +80,6 @@ function NotificationDetailsContent({
     return () => clearInterval(interval);
   }, [notification, deliveries, fetchDetails]);
 
-  // Trigger desktop browser notification when push delivery is completed
   useEffect(() => {
     if (!notification || alertedRef.current) return;
     const hasSentPush = deliveries.some(
@@ -99,16 +93,13 @@ function NotificationDetailsContent({
             body: notification.body,
             icon: '/favicon.ico',
           });
-        } catch (e) {
-          console.warn('Native notification trigger:', e);
-        }
+        } catch {}
       }
     }
   }, [notification, deliveries]);
 
   const handleCancel = async () => {
-    if (!notification) return;
-    if (!confirm('Are you sure you want to cancel this pending notification?')) return;
+    if (!notification || !confirm('Cancel this pending notification?')) return;
     setActionLoading(true);
     try {
       await api.cancelNotification(notification.id);
@@ -140,13 +131,15 @@ function NotificationDetailsContent({
       await api.retryDelivery(notification.id, deliveryId);
       await fetchDetails();
     } catch (err: any) {
-      alert(`Error retrying delivery: ${err.message}`);
+      alert(`Error triggering retry: ${err.message}`);
     } finally {
       setActionLoading(false);
     }
   };
 
-  const hasFailedDeliveries = deliveries.some((d) => d.status === 'FAILED');
+  const hasFailedDeliveries =
+    notification?.status === 'FAILED' ||
+    deliveries.some((d) => d.status === 'FAILED');
 
   if (loading && !notification) {
     return (
@@ -163,10 +156,7 @@ function NotificationDetailsContent({
         <div className="p-4 rounded-xl border border-rose-300 bg-rose-50 text-rose-800 text-sm dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
           {error || 'Notification not found'}
         </div>
-        <Link
-          href="/"
-          className="inline-flex items-center text-sm font-semibold text-indigo-600 hover:underline"
-        >
+        <Link href="/" className="inline-flex items-center text-sm font-semibold text-indigo-600 hover:underline">
           ← Return to Dashboard
         </Link>
       </div>
@@ -187,7 +177,6 @@ function NotificationDetailsContent({
 
       <NotificationMeta notification={notification} deliveries={deliveries} />
 
-      {/* Message Content Preview */}
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs dark:border-zinc-800 dark:bg-zinc-900 space-y-2">
         <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
           Message Body Content
@@ -197,7 +186,6 @@ function NotificationDetailsContent({
         </p>
       </div>
 
-      {/* Channel Deliveries & Attempt Logs */}
       <div className="space-y-6">
         <h2 className="text-lg font-bold text-slate-900 dark:text-zinc-100">
           Delivery Channels & Attempt History

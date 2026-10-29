@@ -16,9 +16,9 @@ export class EmailProvider implements NotificationProvider {
   }
 
   private initTransporter() {
-    const user = process.env.SMTP_USER || process.env.NEXT_PUBLIC_SMTP_USER;
-
     const host = process.env.SMTP_HOST;
+    if (!host) return;
+    const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASSWORD;
 
     if (user && pass) {
@@ -31,21 +31,11 @@ export class EmailProvider implements NotificationProvider {
           pass: pass,
         },
       });
-    } else if (host) {
-      this.transporter = nodemailer.createTransport({
-        host,
-        port: parseInt(process.env.SMTP_PORT || '587', 10),
-        secure:
-          process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
-        auth: user && pass ? { user, pass } : undefined,
-      });
     }
   }
 
   async send(input: SendNotificationInput): Promise<SendNotificationResult> {
-    const host = process.env.SMTP_HOST;
-    if (!host) {
-      this.logger.error('SMTP host is not configured.');
+    if (!process.env.SMTP_HOST) {
       throw new Error(
         'SMTP host is not configured. Please set SMTP_HOST in environment.',
       );
@@ -64,6 +54,7 @@ export class EmailProvider implements NotificationProvider {
 
     this.logger.log(`Sending email to ${input.recipient}: "${input.title}"`);
     await this.transporter.verify();
+
     const info = await this.transporter.sendMail({
       from,
       to: input.recipient,
@@ -73,10 +64,6 @@ export class EmailProvider implements NotificationProvider {
         'X-Idempotency-Key': input.idempotencyKey,
       },
     });
-
-    this.logger.log(
-      `Email sent successfully to ${input.recipient}. Message ID: ${info.messageId}`,
-    );
 
     return {
       providerMessageId: info.messageId,

@@ -10,13 +10,12 @@ export interface ChannelConfig {
 export interface ChannelsState {
   EMAIL: ChannelConfig;
   PUSH: ChannelConfig;
-  TELEGRAM: ChannelConfig;
 }
 
 interface ChannelSelectorProps {
   channels: ChannelsState;
-  onToggleChannel: (ch: 'EMAIL' | 'PUSH' | 'TELEGRAM') => void;
-  onRecipientChange: (ch: 'EMAIL' | 'PUSH' | 'TELEGRAM', recipient: string) => void;
+  onToggleChannel: (ch: 'EMAIL' | 'PUSH') => void;
+  onRecipientChange: (ch: 'EMAIL' | 'PUSH', recipient: string) => void;
 }
 
 export const ChannelSelector: React.FC<ChannelSelectorProps> = ({
@@ -26,6 +25,25 @@ export const ChannelSelector: React.FC<ChannelSelectorProps> = ({
 }) => {
   const { requestPermissionAndGetToken, loading: fcmLoading } = useFcmToken();
 
+  const handleTestDesktopPopup = () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    Notification.requestPermission().then((perm) => {
+      if (perm === 'granted') {
+        new Notification('EC Learnix Desktop Test', {
+          body: 'Browser desktop notifications are working properly!',
+          icon: '/favicon.ico',
+        });
+      } else {
+        alert(`Browser notification permission is: ${perm}. Click the site settings icon to allow.`);
+      }
+    });
+  };
+
+  const handleUseBrowserToken = async () => {
+    const token = await requestPermissionAndGetToken();
+    if (token) onRecipientChange('PUSH', token);
+  };
+
   return (
     <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 space-y-4">
       <div>
@@ -33,24 +51,21 @@ export const ChannelSelector: React.FC<ChannelSelectorProps> = ({
           Notification Channels & Recipients *
         </h3>
         <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-          Each channel is processed independently with isolated retry limits.
+          Select Email, Push, or both. Each channel is processed independently with isolated retry limits.
         </p>
       </div>
 
-      {/* Email Channel */}
       <div className="p-3.5 rounded-lg border border-slate-200 dark:border-zinc-800 space-y-3">
-        <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2 cursor-pointer font-medium text-sm text-slate-900 dark:text-zinc-100">
-            <input
-              type="checkbox"
-              checked={channels.EMAIL.enabled}
-              onChange={() => onToggleChannel('EMAIL')}
-              className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-            />
-            <ChannelIcon channel="EMAIL" className="w-4 h-4 text-emerald-600" />
-            <span>Email (SMTP / Nodemailer)</span>
-          </label>
-        </div>
+        <label className="flex items-center gap-2 cursor-pointer font-medium text-sm text-slate-900 dark:text-zinc-100">
+          <input
+            type="checkbox"
+            checked={channels.EMAIL.enabled}
+            onChange={() => onToggleChannel('EMAIL')}
+            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+          />
+          <ChannelIcon channel="EMAIL" className="w-4 h-4 text-emerald-600" />
+          <span>Email (SMTP / Nodemailer)</span>
+        </label>
         {channels.EMAIL.enabled && (
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1">
@@ -67,7 +82,6 @@ export const ChannelSelector: React.FC<ChannelSelectorProps> = ({
         )}
       </div>
 
-      {/* Push Channel */}
       <div className="p-3.5 rounded-lg border border-slate-200 dark:border-zinc-800 space-y-3">
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-2 cursor-pointer font-medium text-sm text-slate-900 dark:text-zinc-100">
@@ -93,30 +107,14 @@ export const ChannelSelector: React.FC<ChannelSelectorProps> = ({
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (typeof window !== 'undefined' && 'Notification' in window) {
-                      Notification.requestPermission().then((p) => {
-                        if (p === 'granted') {
-                          new Notification('EC Learnix Desktop Test', {
-                            body: 'Browser desktop notifications are working properly!',
-                            icon: '/favicon.ico',
-                          });
-                        } else {
-                          alert(`Browser permission is: ${p}. Click the padlock in Chrome address bar to Allow.`);
-                        }
-                      });
-                    }
-                  }}
+                  onClick={handleTestDesktopPopup}
                   className="text-xs text-slate-600 hover:text-slate-900 font-medium inline-flex items-center gap-1 dark:text-zinc-400 dark:hover:text-zinc-200 hover:underline cursor-pointer"
                 >
                   🔔 Test Desktop Popup
                 </button>
                 <button
                   type="button"
-                  onClick={async () => {
-                    const t = await requestPermissionAndGetToken();
-                    if (t) onRecipientChange('PUSH', t);
-                  }}
+                  onClick={handleUseBrowserToken}
                   disabled={fcmLoading}
                   className="text-xs text-indigo-600 hover:text-indigo-500 font-medium inline-flex items-center gap-1 dark:text-indigo-400 hover:underline cursor-pointer"
                 >
@@ -137,40 +135,6 @@ export const ChannelSelector: React.FC<ChannelSelectorProps> = ({
           </div>
         )}
       </div>
-
-      {/* Telegram Channel */}
-      <div className="p-3.5 rounded-lg border border-slate-200 dark:border-zinc-800 space-y-3">
-        <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2 cursor-pointer font-medium text-sm text-slate-900 dark:text-zinc-100">
-            <input
-              type="checkbox"
-              checked={channels.TELEGRAM.enabled}
-              onChange={() => onToggleChannel('TELEGRAM')}
-              className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-            />
-            <ChannelIcon channel="TELEGRAM" className="w-4 h-4 text-blue-600" />
-            <span>Telegram Bot API</span>
-          </label>
-        </div>
-        {channels.TELEGRAM.enabled && (
-          <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1">
-              Telegram Chat ID
-            </label>
-            <input
-              type="text"
-              value={channels.TELEGRAM.recipient}
-              onChange={(e) => onRecipientChange('TELEGRAM', e.target.value)}
-              placeholder="e.g. 123456789 or @channel_username"
-              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-            />
-            <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1">
-              Requires <code>TELEGRAM_BOT_TOKEN</code> configured on the NestJS backend.
-            </p>
-          </div>
-        )}
-      </div>
     </div>
   );
 };
-
