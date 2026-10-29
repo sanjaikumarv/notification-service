@@ -10,8 +10,10 @@ interface NotificationTableProps {
   loading: boolean;
   statusFilter: string;
   actionLoadingId: string | null;
+  retryingDeliveryId?: string | null;
   onCancel: (id: string) => void;
   onRetry: (id: string) => void;
+  onRetryDelivery?: (notifId: string, deliveryId: string) => void;
 }
 
 export const NotificationTable: React.FC<NotificationTableProps> = ({
@@ -19,8 +21,10 @@ export const NotificationTable: React.FC<NotificationTableProps> = ({
   loading,
   statusFilter,
   actionLoadingId,
+  retryingDeliveryId,
   onCancel,
   onRetry,
+  onRetryDelivery,
 }) => {
   if (loading && notifications.length === 0) {
     return (
@@ -103,17 +107,38 @@ export const NotificationTable: React.FC<NotificationTableProps> = ({
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex flex-wrap gap-1.5">
-                    {notif.deliveries?.map((del) => (
-                      <div
-                        key={del.id}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border border-slate-200 bg-slate-50 dark:border-zinc-700 dark:bg-zinc-800"
-                        title={`${del.channel}: ${del.recipient}`}
-                      >
-                        <ChannelIcon channel={del.channel} className="w-3 h-3 text-slate-500" />
-                        <span className="font-medium text-[11px]">{del.channel}</span>
-                        <StatusBadge status={del.status} size="sm" />
-                      </div>
-                    ))}
+                    {notif.deliveries?.map((del) => {
+                      const isDelRetrying = retryingDeliveryId === del.id;
+                      return (
+                        <div
+                          key={del.id}
+                          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs border border-slate-200 bg-slate-50 dark:border-zinc-700 dark:bg-zinc-800"
+                          title={`${del.channel}: ${del.recipient}`}
+                        >
+                          <ChannelIcon channel={del.channel} className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="font-semibold text-[11px]">{del.channel}</span>
+                          <StatusBadge status={del.status} size="sm" />
+                          {onRetryDelivery && del.status === 'FAILED' && (
+                            <button
+                              type="button"
+                              onClick={() => onRetryDelivery(notif.id, del.id)}
+                              disabled={isDelRetrying}
+                              title={`Retry failed ${del.channel} channel`}
+                              className="p-0.5 rounded text-rose-600 hover:bg-rose-100 dark:text-rose-400 dark:hover:bg-zinc-700 transition cursor-pointer disabled:opacity-50"
+                            >
+                              <svg
+                                className={`w-3 h-3 ${isDelRetrying ? 'animate-spin' : ''}`}
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </td>
                 <td className="px-6 py-4 text-right whitespace-nowrap">
@@ -135,11 +160,23 @@ export const NotificationTable: React.FC<NotificationTableProps> = ({
                     )}
                     {(notif.status === 'FAILED' || notif.deliveries?.some((d) => d.status === 'FAILED')) && (
                       <button
+                        type="button"
                         onClick={() => onRetry(notif.id)}
                         disabled={isActing}
-                        className="px-2.5 py-1 text-xs font-medium rounded border border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-900 dark:text-indigo-400 disabled:opacity-50 transition"
+                        title="Retry failed notification deliveries"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded border border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-900 dark:text-indigo-400 dark:hover:bg-indigo-950/40 disabled:opacity-50 transition cursor-pointer"
                       >
-                        {isActing ? '...' : 'Retry'}
+                        {isActing ? (
+                          <>
+                            <svg className="w-3 h-3 animate-spin text-indigo-600 dark:text-indigo-400" viewBox="0 0 24 24" fill="none">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                            </svg>
+                            <span>Retrying...</span>
+                          </>
+                        ) : (
+                          <span>Retry</span>
+                        )}
                       </button>
                     )}
                   </div>

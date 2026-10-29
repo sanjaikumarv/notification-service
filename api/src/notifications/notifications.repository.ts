@@ -325,12 +325,13 @@ export class NotificationsRepository {
         `UPDATE notification_deliveries
          SET status = 'SENT',
              sent_at = NOW(),
+             attempt_count = $3,
              provider_message_id = $2,
              last_error = NULL,
              next_retry_at = NULL,
              updated_at = NOW()
          WHERE id = $1`,
-        [params.deliveryId, params.providerMessageId ?? null],
+        [params.deliveryId, params.providerMessageId ?? null, params.attemptNumber],
       );
 
       await client.query(
@@ -460,7 +461,10 @@ export class NotificationsRepository {
     deliveryId?: string,
   ): Promise<NotificationDeliveryRecord[]> {
     return this.db.transaction(async (client) => {
-      const conditions = ['notification_id = $1', "status = 'FAILED'"];
+      const conditions = [
+        'notification_id = $1',
+        "(status = 'FAILED' OR (status = 'PENDING' AND last_error IS NOT NULL))",
+      ];
       const values: any[] = [notificationId];
       if (deliveryId) {
         values.push(deliveryId);

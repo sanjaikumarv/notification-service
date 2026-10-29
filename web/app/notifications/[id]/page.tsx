@@ -38,6 +38,7 @@ function NotificationDetailsContent({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [retryingDeliveryId, setRetryingDeliveryId] = useState<string | null>(null);
   const alertedRef = useRef(false);
 
   const fetchDetails = useCallback(async (silent = false) => {
@@ -126,14 +127,14 @@ function NotificationDetailsContent({
 
   const handleRetryDelivery = async (deliveryId: string) => {
     if (!notification) return;
-    setActionLoading(true);
+    setRetryingDeliveryId(deliveryId);
     try {
       await api.retryDelivery(notification.id, deliveryId);
-      await fetchDetails();
+      await fetchDetails(true);
     } catch (err: any) {
       alert(`Error triggering retry: ${err.message}`);
     } finally {
-      setActionLoading(false);
+      setRetryingDeliveryId(null);
     }
   };
 
@@ -195,7 +196,10 @@ function NotificationDetailsContent({
             key={delivery.id}
             delivery={delivery}
             onRetry={handleRetryDelivery}
-            isRetrying={actionLoading}
+            isRetrying={
+              retryingDeliveryId === delivery.id ||
+              (actionLoading && !retryingDeliveryId)
+            }
           />
         ))}
       </div>

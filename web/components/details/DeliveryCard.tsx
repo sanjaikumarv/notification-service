@@ -57,13 +57,29 @@ export const DeliveryCard: React.FC<DeliveryCardProps> = ({
               </div>
             )}
           </div>
-          {delivery.status === 'FAILED' && onRetry && (
+          {onRetry && delivery.status === 'FAILED' && (
             <button
+              type="button"
               onClick={() => onRetry(delivery.id)}
               disabled={isRetrying}
-              className="px-3 py-1.5 text-xs font-semibold rounded-md border border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-900 dark:text-indigo-400 dark:hover:bg-indigo-950/40 transition disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/50 transition-colors shadow-xs disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
             >
-              {isRetrying ? 'Retrying...' : 'Retry Delivery'}
+              {isRetrying ? (
+                <>
+                  <svg className="w-3.5 h-3.5 animate-spin text-rose-600 dark:text-rose-400" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                  <span>Retrying...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>Retry Channel</span>
+                </>
+              )}
             </button>
           )}
         </div>

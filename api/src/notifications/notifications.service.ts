@@ -157,9 +157,12 @@ export class NotificationsService {
     }
 
     for (const delivery of retriedDeliveries) {
-      await this.queueService.enqueueDelivery(delivery.id, new Date(), {
-        overrideDelayMs: 0,
-      });
+      const retried = await this.queueService.retryDeliveryJob(delivery.id);
+      if (!retried) {
+        await this.queueService.enqueueDelivery(delivery.id, new Date(), {
+          overrideDelayMs: 0,
+        });
+      }
     }
 
     return {

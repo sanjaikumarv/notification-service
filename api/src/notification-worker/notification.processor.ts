@@ -4,7 +4,6 @@ import { Job } from 'bullmq';
 import {
   NOTIFICATIONS_QUEUE_NAME,
   DeliveryJobData,
-  NotificationQueueService,
 } from '../notification-queue/notification-queue.service.js';
 import { NotificationsRepository } from '../notifications/notifications.repository.js';
 import { NotificationProviderFactory } from '../notification-providers/notification-provider.factory.js';
@@ -20,7 +19,6 @@ export class NotificationProcessor extends WorkerHost {
   constructor(
     private readonly repo: NotificationsRepository,
     private readonly providerFactory: NotificationProviderFactory,
-    private readonly queueService: NotificationQueueService,
   ) {
     super();
   }
@@ -64,10 +62,12 @@ export class NotificationProcessor extends WorkerHost {
       const errorMessage = err?.message || 'Delivery error';
       this.logger.error(`Delivery failed for ${delivery.id} on attempt ${attemptNumber}: ${errorMessage}`);
 
-      const isFinal = attemptNumber >= MAX_DELIVERY_ATTEMPTS;
+      const maxAttempts = job.opts.attempts || MAX_DELIVERY_ATTEMPTS;
+      const isFinal = attemptNumber >= maxAttempts;
 
       if (!isFinal) {
-        const nextRetryAt = new Date();
+        const backoffDelay = 5000 * Math.pow(2, attemptNumber - 1);
+        const nextRetryAt = new Date(Date.now() + backoffDelay);
 
         await this.repo.recordDeliveryFailure({
           deliveryId: delivery.id,
@@ -76,18 +76,16 @@ export class NotificationProcessor extends WorkerHost {
           isFinal: false,
           nextRetryAt,
         });
-
-        await this.queueService.enqueueDelivery(delivery.id, nextRetryAt, {
-          overrideDelayMs: 0,
-        });
       } else {
         await this.repo.recordDeliveryFailure({
           deliveryId: delivery.id,
           attemptNumber,
-          errorMessage: `Retries exhausted (${MAX_DELIVERY_ATTEMPTS}/${MAX_DELIVERY_ATTEMPTS}): ${errorMessage}`,
+          errorMessage: `Retries exhausted (${maxAttempts}/${maxAttempts}): ${errorMessage}`,
           isFinal: true,
         });
       }
+
+      throw err;
     }
   }
 }

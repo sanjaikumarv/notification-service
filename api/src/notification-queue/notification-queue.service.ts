@@ -31,23 +31,58 @@ export class NotificationQueueService {
 
     const jobId = `delivery-${deliveryId}`;
 
+    try {
+      const existing = await this.queue.getJob(jobId);
+      if (existing) {
+        const state = await existing.getState();
+        if (state !== 'active') {
+          await existing.remove();
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Could not clean previous job ${jobId}: ${err.message}`);
+    }
+
     this.logger.log(
       `Enqueueing BullMQ job ${jobId} with delay of ${delay}ms (target: ${scheduledAt.toISOString()})`,
     );
 
-    // BullMQ add: if job with jobId already exists in delayed or waiting, it won't duplicate
     const job = await this.queue.add(
       'send-delivery',
       { deliveryId },
       {
         jobId,
         delay,
-        removeOnComplete: 1000,
-        removeOnFail: 5000,
+        attempts: 4,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+        removeOnComplete: true,
+        removeOnFail: false,
       },
     );
 
     return job.id!;
+  }
+
+  async retryDeliveryJob(deliveryId: string): Promise<boolean> {
+    const jobId = `delivery-${deliveryId}`;
+    try {
+      const job = await this.queue.getJob(jobId);
+      if (job) {
+        const state = await job.getState();
+        if (state === 'failed') {
+          await job.retry();
+          this.logger.log(`Retried failed BullMQ job ${jobId}`);
+          return true;
+        }
+        await job.remove();
+      }
+    } catch (err: any) {
+      this.logger.warn(`Could not retry BullMQ job ${jobId}: ${err.message}`);
+    }
+    return false;
   }
 
   async removeDelivery(deliveryId: string): Promise<void> {

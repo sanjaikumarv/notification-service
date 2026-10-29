@@ -17,6 +17,7 @@ export default function DashboardPage() {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [retryingDeliveryId, setRetryingDeliveryId] = useState<string | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
@@ -63,6 +64,18 @@ export default function DashboardPage() {
       alert(`Error retrying: ${err.message}`);
     } finally {
       setActionLoadingId(null);
+    }
+  };
+
+  const handleRetryDelivery = async (notifId: string, deliveryId: string) => {
+    setRetryingDeliveryId(deliveryId);
+    try {
+      await api.retryDelivery(notifId, deliveryId);
+      await fetchNotifications();
+    } catch (err: any) {
+      alert(`Error retrying delivery channel: ${err.message}`);
+    } finally {
+      setRetryingDeliveryId(null);
     }
   };
 
@@ -144,8 +157,10 @@ export default function DashboardPage() {
           loading={loading}
           statusFilter={statusFilter}
           actionLoadingId={actionLoadingId}
+          retryingDeliveryId={retryingDeliveryId}
           onCancel={handleCancel}
           onRetry={handleRetry}
+          onRetryDelivery={handleRetryDelivery}
         />
         <Pagination
           page={page}
