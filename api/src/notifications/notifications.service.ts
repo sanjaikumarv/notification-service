@@ -245,4 +245,11 @@ export class NotificationsService {
       sentAt: new Date().toISOString(),
     };
   }
+
+  async deleteAll(): Promise<{ deletedCount: number }> {
+    const deletedCount = await this.repo.deleteAllNotifications();
+    await this.queueService.clearAllJobs();
+    this.logger.log(`Deleted all notification records (${deletedCount}) and cleared BullMQ queue`);
+    return { deletedCount };
+  }
 }

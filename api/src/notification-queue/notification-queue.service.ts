@@ -74,5 +74,18 @@ export class NotificationQueueService {
       return false;
     }
   }
+
+  async clearAllJobs(): Promise<void> {
+    try {
+      await this.queue.drain(true);
+      await this.queue.clean(0, 1000, 'completed');
+      await this.queue.clean(0, 1000, 'failed');
+      await this.queue.clean(0, 1000, 'delayed');
+      await this.queue.clean(0, 1000, 'wait');
+      this.logger.log('Drained and cleaned all BullMQ jobs');
+    } catch (err: any) {
+      this.logger.warn(`Could not clear BullMQ jobs: ${err.message}`);
+    }
+  }
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, use, Suspense } from 'react';
+import React, { useEffect, useState, useCallback, use, Suspense, useRef } from 'react';
 import Link from 'next/link';
 import {
   api,
@@ -42,6 +42,7 @@ function NotificationDetailsContent({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const alertedRef = useRef(false);
 
   const fetchDetails = useCallback(async (silent = false) => {
     if (!id) return;
@@ -83,6 +84,27 @@ function NotificationDetailsContent({
 
     return () => clearInterval(interval);
   }, [notification, deliveries, fetchDetails]);
+
+  // Trigger desktop browser notification when push delivery is completed
+  useEffect(() => {
+    if (!notification || alertedRef.current) return;
+    const hasSentPush = deliveries.some(
+      (d) => d.channel === 'PUSH' && d.status === 'SENT',
+    );
+    if (hasSentPush && typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'granted') {
+        alertedRef.current = true;
+        try {
+          new Notification(notification.title, {
+            body: notification.body,
+            icon: '/favicon.ico',
+          });
+        } catch (e) {
+          console.warn('Native notification trigger:', e);
+        }
+      }
+    }
+  }, [notification, deliveries]);
 
   const handleCancel = async () => {
     if (!notification) return;

@@ -73,55 +73,28 @@ export default function CreateNotificationPage() {
     const errors: string[] = [];
     if (!title.trim()) errors.push("Title is required");
     if (!body.trim()) errors.push("Message body is required");
-    if (!forceImmediate && !scheduledDate)
-      errors.push("Scheduled date and time is required");
+    if (!forceImmediate && !scheduledDate) errors.push("Scheduled date and time is required");
     if (!timezone.trim()) errors.push("Timezone is required");
 
-    const selectedChannels: Array<{
-      channel: "EMAIL" | "PUSH" | "TELEGRAM";
-      recipient: string;
-    }> = [];
+    const selectedChannels: Array<{ channel: "EMAIL" | "PUSH" | "TELEGRAM"; recipient: string }> = [];
 
     if (channels.EMAIL.enabled) {
-      if (!channels.EMAIL.recipient.trim()) {
-        errors.push("Email recipient is required when Email is enabled");
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(channels.EMAIL.recipient)) {
-        errors.push("Email recipient has an invalid email format");
-      } else {
-        selectedChannels.push({
-          channel: "EMAIL",
-          recipient: channels.EMAIL.recipient.trim(),
-        });
-      }
+      if (!channels.EMAIL.recipient.trim()) errors.push("Email recipient is required when Email is enabled");
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(channels.EMAIL.recipient)) errors.push("Email recipient has an invalid email format");
+      else selectedChannels.push({ channel: "EMAIL", recipient: channels.EMAIL.recipient.trim() });
     }
 
     if (channels.PUSH.enabled) {
-      if (!channels.PUSH.recipient.trim()) {
-        errors.push("Push device token is required when Push is enabled");
-      } else {
-        selectedChannels.push({
-          channel: "PUSH",
-          recipient: channels.PUSH.recipient.trim(),
-        });
-      }
+      if (!channels.PUSH.recipient.trim()) errors.push("Push device token is required when Push is enabled");
+      else selectedChannels.push({ channel: "PUSH", recipient: channels.PUSH.recipient.trim() });
     }
 
     if (channels.TELEGRAM.enabled) {
-      if (!channels.TELEGRAM.recipient.trim()) {
-        errors.push("Telegram Chat ID is required when Telegram is enabled");
-      } else {
-        selectedChannels.push({
-          channel: "TELEGRAM",
-          recipient: channels.TELEGRAM.recipient.trim(),
-        });
-      }
+      if (!channels.TELEGRAM.recipient.trim()) errors.push("Telegram Chat ID is required when Telegram is enabled");
+      else selectedChannels.push({ channel: "TELEGRAM", recipient: channels.TELEGRAM.recipient.trim() });
     }
 
-    if (selectedChannels.length === 0) {
-      errors.push(
-        "At least one notification delivery channel must be selected",
-      );
-    }
+    if (selectedChannels.length === 0) errors.push("At least one notification delivery channel must be selected");
 
     if (errors.length > 0) {
       setFormErrors(errors);
@@ -130,10 +103,8 @@ export default function CreateNotificationPage() {
 
     setLoading(true);
     try {
-      const scheduledUtc =
-        forceImmediate || selectedPreset === 0
-          ? new Date().toISOString()
-          : new Date(scheduledDate).toISOString();
+      const isImmediate = forceImmediate || selectedPreset === 0;
+      const scheduledUtc = isImmediate ? new Date().toISOString() : new Date(scheduledDate).toISOString();
       const response = await api.createNotification({
         title: title.trim(),
         body: body.trim(),
@@ -143,7 +114,7 @@ export default function CreateNotificationPage() {
       });
 
       setSuccessMessage(
-        forceImmediate || selectedPreset === 0
+        isImmediate
           ? `Dispatched immediately! Notification ID: ${response.data.id}`
           : `Notification scheduled successfully! ID: ${response.data.id}`,
       );

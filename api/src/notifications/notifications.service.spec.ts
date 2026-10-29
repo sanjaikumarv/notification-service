@@ -18,11 +18,13 @@ describe('NotificationsService', () => {
       cancelNotification: vi.fn(),
       resetFailedDeliveriesForRetry: vi.fn(),
       getDeliveriesWithAttempts: vi.fn(),
+      deleteAllNotifications: vi.fn().mockResolvedValue(5),
     };
 
     mockQueueService = {
       enqueueDelivery: vi.fn().mockResolvedValue('job-1'),
       removeDelivery: vi.fn().mockResolvedValue(undefined),
+      clearAllJobs: vi.fn().mockResolvedValue(undefined),
     };
 
     const mockEmailProvider = {
@@ -179,6 +181,14 @@ describe('NotificationsService', () => {
     expect(res.recipient).toBe('recipient@example.com');
     expect(res.providerMessageId).toBe('test-email-msg-id');
     expect(res.sentAt).toBeDefined();
+  });
+
+  it('deletes all notifications and clears queue jobs', async () => {
+    const res = await service.deleteAll();
+
+    expect(res.deletedCount).toBe(5);
+    expect(mockRepo.deleteAllNotifications).toHaveBeenCalledTimes(1);
+    expect(mockQueueService.clearAllJobs).toHaveBeenCalledTimes(1);
   });
 });
 

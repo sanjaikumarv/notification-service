@@ -9,6 +9,7 @@ import { NotificationQueueModule } from './notification-queue/notification-queue
 import { NotificationWorkerModule } from './notification-worker/notification-worker.module.js';
 import { NotificationRecoveryModule } from './notification-recovery/notification-recovery.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
+import { DevicesModule } from './devices/devices.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -24,6 +25,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     NotificationProvidersModule,
     NotificationQueueModule,
     NotificationsModule,
+    DevicesModule,
     NotificationWorkerModule,
     NotificationRecoveryModule,
   ],

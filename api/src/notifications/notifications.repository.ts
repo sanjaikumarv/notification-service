@@ -497,5 +497,20 @@ export class NotificationsRepository {
       return delivRes.rows;
     });
   }
+
+  async deleteAllNotifications(): Promise<number> {
+    return this.db.transaction(async (client) => {
+      const countRes = await client.query<{ total: string }>(
+        'SELECT COUNT(*) AS total FROM notifications',
+      );
+      const total = parseInt(countRes.rows[0]?.total ?? '0', 10);
+
+      await client.query(
+        'TRUNCATE TABLE delivery_attempts, notification_deliveries, notifications RESTART IDENTITY CASCADE',
+      );
+
+      return total;
+    });
+  }
 }
 

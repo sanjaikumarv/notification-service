@@ -136,4 +136,37 @@ export const api = {
       method: "POST",
     });
   },
+
+  async deleteAllNotifications(): Promise<{ message: string; data: { deletedCount: number } }> {
+    return fetchJson('/api/notifications', {
+      method: 'DELETE',
+    });
+  },
+
+  async sendTestEmail(params: {
+    to: string;
+    subject?: string;
+    body?: string;
+  }): Promise<{ message: string; data: { recipient: string; providerMessageId: string; sentAt: string } }> {
+    return fetchJson('/api/notifications/test-email', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  },
+
+  async registerDevice(payload: {
+    token: string;
+    platform: 'WEB' | 'ANDROID' | 'IOS';
+    deviceName?: string;
+    userId?: string;
+  }): Promise<{ message: string; data: any }> {
+    return fetchJson('/api/devices/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async listDevices(): Promise<{ data: any[] }> {
+    return fetchJson('/api/devices');
+  },
 };

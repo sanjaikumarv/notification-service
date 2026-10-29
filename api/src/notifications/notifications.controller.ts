@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -179,6 +180,23 @@ export class NotificationsController {
       statusCode: 200,
       data: deliveries,
     };
+  }
+
+  @Delete()
+  @HttpCode(HttpStatus.OK)
+  async deleteAll() {
+    const result = await this.notificationsService.deleteAll();
+    return {
+      statusCode: 200,
+      message: `Successfully deleted ${result.deletedCount} notification record(s) and cleared queue jobs`,
+      data: result,
+    };
+  }
+
+  @Delete('all')
+  @HttpCode(HttpStatus.OK)
+  async deleteAllAlias() {
+    return this.deleteAll();
   }
 }
 

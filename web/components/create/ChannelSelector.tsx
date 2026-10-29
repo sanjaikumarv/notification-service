@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChannelIcon } from '@/components/ChannelIcon';
+import { useFcmToken } from '@/hooks/useFcmToken';
 
 export interface ChannelConfig {
   enabled: boolean;
@@ -23,6 +24,8 @@ export const ChannelSelector: React.FC<ChannelSelectorProps> = ({
   onToggleChannel,
   onRecipientChange,
 }) => {
+  const { requestPermissionAndGetToken, loading: fcmLoading } = useFcmToken();
+
   return (
     <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 space-y-4">
       <div>
@@ -75,26 +78,61 @@ export const ChannelSelector: React.FC<ChannelSelectorProps> = ({
               className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
             />
             <ChannelIcon channel="PUSH" className="w-4 h-4 text-amber-600" />
-            <span>Push Notifications</span>
+            <span>Push Notifications (Firebase FCM)</span>
           </label>
           <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
-            MOCK PROVIDER
+            FCM v1 / MOCK
           </span>
         </div>
         {channels.PUSH.enabled && (
           <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1">
-              Device Token / Client ID
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-medium text-slate-600 dark:text-zinc-400">
+                FCM Device Registration Token *
+              </label>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && 'Notification' in window) {
+                      Notification.requestPermission().then((p) => {
+                        if (p === 'granted') {
+                          new Notification('EC Learnix Desktop Test', {
+                            body: 'Browser desktop notifications are working properly!',
+                            icon: '/favicon.ico',
+                          });
+                        } else {
+                          alert(`Browser permission is: ${p}. Click the padlock in Chrome address bar to Allow.`);
+                        }
+                      });
+                    }
+                  }}
+                  className="text-xs text-slate-600 hover:text-slate-900 font-medium inline-flex items-center gap-1 dark:text-zinc-400 dark:hover:text-zinc-200 hover:underline cursor-pointer"
+                >
+                  🔔 Test Desktop Popup
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const t = await requestPermissionAndGetToken();
+                    if (t) onRecipientChange('PUSH', t);
+                  }}
+                  disabled={fcmLoading}
+                  className="text-xs text-indigo-600 hover:text-indigo-500 font-medium inline-flex items-center gap-1 dark:text-indigo-400 hover:underline cursor-pointer"
+                >
+                  {fcmLoading ? 'Registering...' : '⚡ Use My Browser Token'}
+                </button>
+              </div>
+            </div>
             <input
               type="text"
               value={channels.PUSH.recipient}
               onChange={(e) => onRecipientChange('PUSH', e.target.value)}
-              placeholder="e.g. fcm-client-mock-token-xyz"
-              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              placeholder="e.g. fcm-device-registration-token..."
+              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 font-mono text-xs"
             />
-            <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
-              Mock provider generates simulated receipts without requiring real FCM credentials.
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1">
+              Supports FCM Web tokens, Android registration tokens, and iOS APNs tokens via Firebase Cloud Messaging.
             </p>
           </div>
         )}
